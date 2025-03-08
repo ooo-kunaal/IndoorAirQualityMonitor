@@ -1,3 +1,3 @@
-#define SECRET_DEVICE_KEY "xgv@hD6MvkFTvECoM6ffa6cKk"
-#define SECRET_OPTIONAL_PASS "7003509770kushal"
-#define SECRET_SSID "Phoenix-extend"
+#define SECRET_DEVICE_KEY "..." // generate on Arduino Cloud
+#define SECRET_OPTIONAL_PASS "..." // wifi password
+#define SECRET_SSID "..." // wifi name
