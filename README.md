@@ -7,3 +7,5 @@
 * DHT11 Temp & Humidity Sensor - https://amzn.to/4hgtKDm
 * MQ135 Air Quality Sensor - https://amzn.to/43s8s2j
 * ESP32 Dev Module - https://amzn.to/43ueEa4 
+
+![image](https://github.com/user-attachments/assets/b02c8a53-51ee-4ba1-b5bf-d58bac7440b0)
