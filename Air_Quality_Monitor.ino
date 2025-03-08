@@ -2,15 +2,15 @@
 #include "thingProperties.h"
 #include "DHT.h"
 
-#define DHTpin 13
+#define DHTpin 13 // enter your pin
 #define DHTTYPE DHT11
 DHT dht(DHTpin, DHTTYPE);
 
-int mqSensorPin = 34;  // MQ135 sensor analog pin
+int mqSensorPin = 34;  // MQ135 sensor analog pin (enter your pin)
 
 // Calibration parameters (adjust these values based on your calibration data)
-const int MQ135_MIN_RAW = 150;   // Hypothetical raw value for 10 ppm (clean air)
-const int MQ135_MAX_RAW = 3500;  // Hypothetical raw value for 1000 ppm
+const int MQ135_MIN_RAW = 150;
+const int MQ135_MAX_RAW = 3500;
 
 // Function to average multiple analog readings for the MQ135 sensor
 int readRawAirQuality() {
@@ -95,11 +95,6 @@ void loop() {
   // Optional delay to manage sensor read intervals and cloud update frequency
   delay(2000);
 }
-
-/*
-  Callback functions triggered by changes from Arduino IoT Cloud.
-  You can add additional functionality within these as needed.
-*/
 
 void onTemperatureChange() {
   // Code to execute when the Temperature variable is updated from the cloud
