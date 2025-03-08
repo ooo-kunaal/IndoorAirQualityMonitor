@@ -1,4 +1,4 @@
-# RoomQualityMonitor
+# Room Quality Monitor
 
 ![image](https://github.com/user-attachments/assets/f5224b81-8b4c-4583-9963-32ef2fa9c76a)
 
