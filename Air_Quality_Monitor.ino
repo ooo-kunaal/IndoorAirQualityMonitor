@@ -1,37 +1,50 @@
 #include "arduino_secrets.h"
 #include "thingProperties.h"
 #include "DHT.h"
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <MQ7.h>
 
-#define DHTpin 13 // enter your pin
+// DHT sensor definitions
+#define DHTpin 13
 #define DHTTYPE DHT11
 DHT dht(DHTpin, DHTTYPE);
 
-int mqSensorPin = 34;  // MQ135 sensor analog pin (enter your pin)
+// OLED display definitions
+#define SCREEN_WIDTH 128  // OLED display width in pixels
+#define SCREEN_HEIGHT 64  // OLED display height in pixels
+#define OLED_RESET    -1  // Reset pin (or -1 if sharing Arduino reset)
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-// Calibration parameters (adjust these values based on your calibration data)
-const int MQ135_MIN_RAW = 150;
-const int MQ135_MAX_RAW = 3500;
+// Define sensor pins for ESP32
+int mq135SensorPin = 34;    // MQ135 sensor analog pin (general air quality)
+int mq7SensorPin   = 35;    // MQ7 sensor analog pin (CO measurement)
 
-// Function to average multiple analog readings for the MQ135 sensor
-int readRawAirQuality() {
-  const int samples = 10;
+// Instantiate MQ7 sensor object with analog pin and input voltage (5V)
+MQ7 mq7(mq7SensorPin, 5.0);
+
+// Calibration parameters for MQ135 (using linear interpolation)
+const int MQ135_MIN_RAW = 150;   // Hypothetical raw value for 10 ppm (clean air)
+const int MQ135_MAX_RAW = 3500;  // Hypothetical raw value for 1000 ppm
+
+// Function to average multiple analog readings (for MQ135)
+int readRawValue(int pin, int samples = 10, int delayMs = 10) {
   long sum = 0;
   for (int i = 0; i < samples; i++) {
-    sum += analogRead(mqSensorPin);
-    delay(10);  // Short delay between readings
+    sum += analogRead(pin);
+    delay(delayMs);
   }
   return sum / samples;
 }
 
-// Function to convert raw analog value to ppm based on a linear approximation.
-// The result is constrained between 10 ppm and 1000 ppm.
-float convertToPPM(int rawValue) {
+// Convert MQ135 raw value to ppm (linear interpolation)
+float convertMQ135ToPPM(int rawValue) {
   if (rawValue <= MQ135_MIN_RAW) {
     return 10.0;
   } else if (rawValue >= MQ135_MAX_RAW) {
     return 1000.0;
   } else {
-    // Linear interpolation between the min and max raw values.
     float ppm = 10.0 + (rawValue - MQ135_MIN_RAW) * (1000.0 - 10.0) / (MQ135_MAX_RAW - MQ135_MIN_RAW);
     return ppm;
   }
@@ -39,7 +52,7 @@ float convertToPPM(int rawValue) {
 
 void setup() {
   Serial.begin(9600);
-  delay(1000); // Wait for the serial monitor to initialize
+  delay(1000); // Allow time for Serial monitor initialization
   
   // Initialize the DHT sensor
   dht.begin();
@@ -49,9 +62,23 @@ void setup() {
 
   // Connect to Arduino IoT Cloud
   ArduinoCloud.begin(ArduinoIoTPreferredConnection);
-
   setDebugMessageLevel(2);
   ArduinoCloud.printDebugInfo();
+
+  // Initialize OLED display
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // 0x3C is common I2C address for OLED
+    Serial.println(F("SSD1306 allocation failed"));
+    for(;;); // Halt if OLED not detected
+  }
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0,0);
+  display.println("Air Quality Monitor");
+  display.display();
+  delay(2000);
+
+  // Initialize MQ7 sensor (the library's init function may handle heater timing if needed)
 }
 
 void loop() {
@@ -61,10 +88,10 @@ void loop() {
   float humidityValue = dht.readHumidity();
   float temperatureValue = dht.readTemperature();
   
-  // Validate sensor readings before updating the cloud
   if (isnan(humidityValue) || isnan(temperatureValue)) {
     Serial.println("Failed to read from DHT sensor!");
   } else {
+    Serial.print("----------------");
     Serial.print("Humidity: ");
     Serial.println(humidityValue);
     Serial.print("Temperature: ");
@@ -74,40 +101,90 @@ void loop() {
     temperature = temperatureValue;
   }
   
-  // Read and average raw value from the MQ135 sensor
-  int rawAirQuality = readRawAirQuality();
-  // Convert the raw value to gas concentration (ppm)
-  float airQualityPPM = convertToPPM(rawAirQuality);
-  
-  Serial.print("Raw Air Quality: ");
+  // Read and average raw value from the MQ135 sensor and convert to ppm
+  int rawAirQuality = readRawValue(mq135SensorPin);
+  float airQualityPPM = convertMQ135ToPPM(rawAirQuality);
+  Serial.print("Raw Air Quality (MQ135): ");
   Serial.println(rawAirQuality);
   Serial.print("Air Quality (ppm): ");
   Serial.println(airQualityPPM);
-  
-  // Update the cloud variable with the computed ppm value
   airquality = airQualityPPM;
   
-  // Create a combined message string
-  message = "Temperature = " + String(temperatureValue) +
-            "  Humidity = " + String(humidityValue) +
-            "  Air Quality = " + String(airQualityPPM) + " ppm";
-            
-  // Optional delay to manage sensor read intervals and cloud update frequency
+  // Read CO concentration using MQ7 library (this function returns ppm)
+  float coPPM = mq7.getPPM();
+  Serial.print("MQ7 CO (ppm): ");
+  Serial.println(coPPM);
+  carbonMonoxide = coPPM;
+  
+  // Update message string (cloud variable)
+  message = "Temp=" + String(temperatureValue, 1) + "C  Hum=" + String(humidityValue, 0) +
+            "%  AQ=" + String(airQualityPPM, 0) + "ppm  CO=" + String(coPPM, 0) + "ppm";
+  
+  // Display Temperature reading
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.setTextSize(1);
+  display.println("Temperature:");
+  display.println("------------");
+  display.setTextSize(2);
+  display.println(String(temperatureValue, 1) + " C");
+  display.display();
+  delay(2000);
+  
+  // Display Humidity reading
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.setTextSize(1);
+  display.println("Humidity:");
+  display.println("---------");
+  display.setTextSize(2);
+  display.println(String(humidityValue, 0) + "%");
+  display.display();
+  delay(2000);
+  
+  // Display Air Quality reading
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.setTextSize(1);
+  display.println("Air Quality:");
+  display.println("------------");
+  display.setTextSize(2);
+  display.println(String(airQualityPPM, 0) + " ppm");
+  display.display();
+  delay(2000);
+  
+  // Display Carbon Monoxide reading
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.setTextSize(1);
+  display.println("CO Concentration:");
+  display.println("-----------------");
+  display.setTextSize(2);
+  display.println(String(coPPM, 0) + " ppm");
+  display.display();
   delay(2000);
 }
 
+/*
+  Callback functions triggered by changes from Arduino IoT Cloud.
+*/
+
 void onTemperatureChange() {
-  // Code to execute when the Temperature variable is updated from the cloud
+  // Code to execute when Temperature variable is updated from the cloud
 }
 
 void onHumidityChange() {
-  // Code to execute when the Humidity variable is updated from the cloud
+  // Code to execute when Humidity variable is updated from the cloud
 }
 
 void onAirqualityChange() {
-  // Code to execute when the Air Quality variable is updated from the cloud
+  // Code to execute when Air Quality variable is updated from the cloud
+}
+
+void onCarbonMonoxideChange() {
+  // Code to execute when Carbon Monoxide variable is updated from the cloud
 }
 
 void onMessageChange() {
-  // Code to execute when the Message variable is updated from the cloud
+  // Code to execute when Message variable is updated from the cloud
 }
