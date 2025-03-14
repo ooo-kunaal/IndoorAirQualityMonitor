@@ -1,4 +1,4 @@
-# Room Quality Monitor
+# Indoor Air Quality Monitor
 
 Youtube Video - [https://www.youtube.com/shorts/n_vJZgnYDlU?feature=share ](https://youtube.com/shorts/BAg5vC72PNA?feature=share) 
 
