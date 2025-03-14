@@ -11,3 +11,5 @@ Youtube Video - https://www.youtube.com/shorts/n_vJZgnYDlU?feature=share
 * MQ7 Carbon Monoxide Sensor - https://amzn.to/4ivt3aE
 * ESP32 Dev Module - https://amzn.to/43ueEa4
 * OLED Screen - https://amzn.to/3XLS6Oj 
+
+![ezgif-5e2c44c4832084](https://github.com/user-attachments/assets/0aee1e20-9a06-44fb-ad19-a05f50ee66c4)
